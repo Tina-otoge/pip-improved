@@ -39,9 +39,9 @@ If you wish to work outside of a virtual environment, you can use the `--user`
 flag. This will try to use [pipus](https://github.com/Tina-otoge/pipus) if it is
 found in your PATH, and will resort to regular `pip` otherwise.
 
-### Install from requirements.txt
+### Install packages from requirements.txt
 
-If you do not specify any package, this will run `pip install -r requirements. txt`
+If you do not specify any package, this will run `pip install -r requirements.txt`
 in the virtual environment. As with other install commands, this will
 create the venv first if it does not exist already.
 
@@ -60,10 +60,23 @@ You can use `pipim replace-pip` once to create a simple script in
 forget about pipim and just run `pip` like you always did before, except that
 now it comes with extra perks ✨✨.
 
+### Run a command inside the virtual environment
+
+```
+pip run <command> [arguments...]
+```
+
+The first argument will be invoked from `.venv/bin/`, everything that follows is
+passed to it. For example:
+
+```
+pip run flask --help
+```
+
 ### Always fallback to regular pip
 
-If you run any other command or use any other flag, pipim will fallback to using
-pip instead.
+Every unmatched flags are passed down to pip, any unrecognized command will run
+pip too.
 
 ## Contributing
 

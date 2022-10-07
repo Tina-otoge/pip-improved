@@ -4,63 +4,52 @@ import os
 import shutil
 import sys
 import venv
-from argparse import ArgumentParser
 from pathlib import Path
-
-
-class ArgumentParser(ArgumentParser):
-    def error(self, *args, **kwargs):
-        raise Exception
 
 
 def log(*args):
     print("pipim:", *args)
 
 
-INSTALL_ALIASES = ["i", "in"]
-UNINSTALL_ALIASES = ["u", "un", "remove"]
+HELP = """\
+pipim: pip improved
 
 
-parser = ArgumentParser()
-parser.description = "pipim: pip improved"
-parser.epilog = (
-    "For any other command, pipim will run pip instead, see python -m pip"
-    " --help for more information about pip"
-)
-parser.add_argument(
-    "--user",
-    action="store_true",
-    help=(
-        "Install packages in user site-packages. If pipus is found, it will be"
-        " used instead of pip"
-    ),
-)
-parser.add_argument(
-    "command",
-    choices=[
-        "install",
-        *INSTALL_ALIASES,
-        "uninstall",
-        *UNINSTALL_ALIASES,
-        "replace-pip",
-    ],
-    default="install",
-    nargs="?",
-    help=(
-        "install and uninstall will invoke pip in a venv, replace-pip will"
-        " create a script in ~/.local/bin/pip that will invoke pipim instead of"
-        " pip"
-        "\ndefault: install"
-    ),
-)
-parser.add_argument(
-    "packages",
-    nargs="*",
-    help=(
-        "Packages to install/uninstall. If none are given, pipim will install"
-        " the packages listed in requirements.txt."
-    ),
-)
+pipim will create a virtual environment in the current directory if one doesn't
+already exist, and run pip inside it, unless the --user flag is passed.
+
+
+Usage:
+    pipim [command] [arguments...]
+
+
+The default command is install if none is specified.
+
+
+Commands:
+    install, i, in:        Install packages in a virtual environment
+                           If no packages are provided, installs from
+                           requirements.txt instead
+
+    uninstall, un, remove: Uninstall packages from a virtual environment
+
+    run, r:                Run a command in a virtual environment
+                           Everything after the run command is passed to the
+                           command
+
+    replace-pip:           Writes a script to ~/.local/bin/pip that runs pipim
+                           instead of pip
+
+    help                   Show this help message
+
+Flags:
+    -h, --help:            Show this help message
+    -u, --user:            Work with the user's packages instead of a virtual
+                           environment. pipus will be used if available.
+
+
+Any other flags or arguments will be passed down to pip.
+"""
 
 
 def ensure_venv():
@@ -86,38 +75,90 @@ def replace_pip():
         log(target, "already exists")
         sys.exit(1)
     with target.open("w") as f:
-        f.write("#!/bin/sh\n\nexec pipim $@\n")
+        f.write('#!/bin/sh\n\nexec pipim "$@"\n')
     target.chmod(0o755)
-    log("Created", target, ", you may need to refresh your environment")
+    log("Created", target, "you may need to refresh your environment")
+
+
+def argument_parser(d: dict, stops=[]) -> dict:
+    """Parses arguments into a dictionary
+
+    Dictionary keys are the names of the arguments, and the values are the
+    names of the flags or commands that should be associated with them.
+    Values can be a string or a list of strings.
+
+    Returns a dictionary with the same keys as the input, and values that are
+    True if the argument was passed, and False otherwise.
+
+    Example:
+        argument_parser({"help": ["-h", "--help"]})
+        # If the script is called with -h or --help, returns {"help": True}
+        # Otherwise, returns {"help": False}
+    """
+
+    rules = {}
+    result = {}
+    arguments = []
+    for name, match in d.items():
+        result[name] = False
+        if not isinstance(match, list):
+            match = [match]
+        for m in match:
+            rules[m] = name
+    for i, arg in enumerate(sys.argv[1:]):
+        if arg in rules:
+            name = rules[arg]
+            result[name] = True
+            if name in stops:
+                arguments = sys.argv[i + 2 :]
+                break
+        else:
+            arguments.append(arg)
+    result["arguments"] = arguments
+    return result
 
 
 def main():
-    try:
-        args = parser.parse_args()
-    except Exception:
-        if not os.path.exists(".venv"):
-            exec("python", "-m", "pip", *sys.argv[1:])
-        exec(".venv/bin/pip", *sys.argv[1:])
+    args = argument_parser(
+        {
+            "help": ["help", "-h", "--help"],
+            "user": ["-u", "--user"],
+            "install": ["install", "i", "in"],
+            "uninstall": ["uninstall", "u", "un", "remove"],
+            "run": ["run", "r"],
+            "replace_pip": "replace-pip",
+        },
+        stops=["run"],
+    )
 
-    if args.command == "replace-pip":
+    if args["help"]:
+        print(HELP)
+        return
+
+    if args["replace_pip"]:
         replace_pip()
         return
 
-    if args.command in INSTALL_ALIASES:
-        args.command = "install"
-    if args.command in UNINSTALL_ALIASES:
-        args.command = "uninstall"
-
-    if args.user:
+    if args["user"]:
         if shutil.which("pipus") is not None:
             log("pipus found, using it instead of pip")
-            command = "" if args.command == "install" else "-R"
-            exec("pipus", command, *args.packages)
-
+            command = "-R" if args["uninstall"] else ""
+            exec("pipus", command, *args["arguments"])
+        if args["install"]:
+            command = "install"
+        elif args["uninstall"]:
+            command = "uninstall"
+        else:
+            command = ""
         log("pipus not found, using pip instead")
-        exec("pip", *sys.argv[1:])
+        exec("pip", command, *args["arguments"])
 
-    if len(args.packages) == 0:
+    if args["run"]:
+        ensure_venv()
+        command = args["arguments"][0] if args["arguments"] else "python"
+        exec(f".venv/bin/{command}", *args["arguments"][1:])
+
+    if len(args["arguments"]) == 0:
         if not os.path.exists("requirements.txt"):
             log("No requirements.txt found, exiting")
             sys.exit(1)
@@ -126,7 +167,7 @@ def main():
         exec(".venv/bin/pip", "install", "-r", "requirements.txt")
 
     ensure_venv()
-    exec(".venv/bin/pip", *sys.argv[1:])
+    exec(".venv/bin/pip", *args["arguments"])
 
 
 if __name__ == "__main__":
