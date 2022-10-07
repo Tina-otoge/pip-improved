@@ -16,8 +16,8 @@ pipim.
 ## Rationale
 
 When you work on Python projects, you often find yourself creating virtual
-environments yourself, and having to manually activate them or install
-dependencies in them.
+environments, and having to manually activate them or install dependencies in
+them.
 
 This is not something you typically do with other languages, where the package
 manager is smart enough to know if you meant to install packages at the user
