@@ -3,6 +3,16 @@
 Drop-in replacement for pip with behavior that imitates other popular languages
 packages managers.
 
+## Installing
+
+```
+pip install --user pipim
+```
+
+Then, if you wish for pipim to be invoked when you simply type `pip`, you can
+use `pipim replace-pip` to create a script in `~/.local/bin/pip` that will run
+pipim.
+
 ## Rationale
 
 When you work on Python projects, you often find yourself creating virtual
