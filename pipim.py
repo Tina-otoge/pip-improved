@@ -158,13 +158,21 @@ def main():
         command = args["arguments"][0] if args["arguments"] else "python"
         exec(f".venv/bin/{command}", *args["arguments"][1:])
 
-    if len(args["arguments"]) == 0:
-        if not os.path.exists("requirements.txt"):
-            log("No requirements.txt found, exiting")
-            sys.exit(1)
+    if args["uninstall"]:
+        exec("pip", "uninstall", *args["arguments"])
 
+    if len(args["arguments"]) == 0:
+        args["install"] = True
+
+    if args["install"]:
+        if len(args["arguments"]) == 0:
+            if not os.path.exists("requirements.txt"):
+                log("No requirements.txt found, exiting")
+                sys.exit(1)
+            ensure_venv()
+            exec(".venv/bin/pip", "install", "-r", "requirements.txt")
         ensure_venv()
-        exec(".venv/bin/pip", "install", "-r", "requirements.txt")
+        exec(".venv/bin/pip", "install", *args["arguments"])
 
     ensure_venv()
     exec(".venv/bin/pip", *args["arguments"])
