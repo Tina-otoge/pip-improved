@@ -151,7 +151,7 @@ def main():
         else:
             command = ""
         log("pipus not found, using pip instead")
-        exec("pip", command, *args["arguments"])
+        exec("python", "-m", "pip", command, *args["arguments"])
 
     if args["run"]:
         ensure_venv()
@@ -159,7 +159,7 @@ def main():
         exec(f".venv/bin/{command}", *args["arguments"][1:])
 
     if args["uninstall"]:
-        exec("pip", "uninstall", *args["arguments"])
+        exec("python", "-m", "pip", "uninstall", *args["arguments"])
 
     if len(args["arguments"]) == 0:
         args["install"] = True
