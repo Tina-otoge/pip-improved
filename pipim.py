@@ -2,6 +2,7 @@
 
 import os
 import shutil
+import subprocess
 import sys
 import venv
 from pathlib import Path
@@ -37,6 +38,11 @@ Commands:
                            Everything after the run command is passed to the
                            command
 
+    update, up:            Read dependencies from a file called
+                           requirements.update.txt or anything passed as an
+                           argument, update them to the latest version, then
+                           write the frozen requirements to requirements.txt
+
     replace-pip:           Writes a script to ~/.local/bin/pip that runs pipim
                            instead of pip
 
@@ -52,12 +58,22 @@ Any other flags or arguments will be passed down to pip.
 """
 
 
-def ensure_venv():
+def ensure_venv(path=".venv"):
     """Creates a venv if it doesn't exist"""
 
-    if not os.path.exists(".venv"):
+    if not os.path.exists(path):
         log("Creating virtual environment...")
-        venv.create(".venv", with_pip=True)
+        venv.create(path, with_pip=True)
+
+
+def run(*args):
+    """Run a command and return the output"""
+
+    log("Running", *args)
+    process = subprocess.run(args, stdout=subprocess.PIPE)
+    if process.returncode != 0:
+        error("Command failed:", *args)
+    return process.stdout.decode("utf-8")
 
 
 def exec(*args):
@@ -118,17 +134,25 @@ def argument_parser(d: dict, stops=[]) -> dict:
     return result
 
 
+def error(*args, help=False):
+    print("pipim:", *args, file=sys.stderr)
+    if help:
+        print(HELP, file=sys.stderr)
+    sys.exit(1)
+
+
 def main():
     args = argument_parser(
         {
             "help": ["help", "-h", "--help"],
             "user": ["-u", "--user"],
             "install": ["install", "i", "in"],
+            "update": ["update", "up"],
             "uninstall": ["uninstall", "u", "un", "remove"],
             "run": ["run", "r"],
             "replace_pip": "replace-pip",
         },
-        stops=["run"],
+        stops=["run", "update"],
     )
 
     if args["help"]:
@@ -160,6 +184,31 @@ def main():
 
     if args["uninstall"]:
         exec("python", "-m", "pip", "uninstall", *args["arguments"])
+
+    if args["update"]:
+        if len(args["arguments"]) > 1:
+            error(
+                "Update command takes either a requirements.txt-like file as"
+                " parameter or no parameters at all",
+                help=True,
+            )
+        file = (
+            args["arguments"][0]
+            if args["arguments"]
+            else "requirements.update.txt"
+        )
+        if not os.path.exists(file):
+            error(f"File {file} not found")
+        log("Working in temporary .update virtual environment...")
+        ensure_venv(".update")
+        run(".update/bin/pip", "install", "-U", "-r", file)
+        requirements = run(".update/bin/pip", "freeze")
+        with open("requirements.txt", "w") as f:
+            f.write(requirements)
+        log("Updated requirements.txt")
+        shutil.rmtree(".update")
+        log("Removed .update")
+        sys.exit(0)
 
     if len(args["arguments"]) == 0:
         args["install"] = True
